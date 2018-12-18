@@ -68,22 +68,27 @@ outSampLas = predict(lassoSampleModel,newx = as.matrix(
 
 ####### Visualization 
 ######### train
-plot(XtrainSamp$Y,main = 'Example Tract Prediction Models Insample',xlab = 'Month', 
-     ylab = 'Crime Rate' )
+plot(XtrainSamp$Y,main = 'Example Tract Regularized Linear Prediction Models Insample',xlab = 'Month', 
+     ylab = 'Crime Rate')
 lines(exp(predict(samplinModel)),col='blue')
-lines(predict(sampPosModel,type='response'),col='red')
-lines(predict(dtSampModel),col='green')
-lines(inSampRidge,col='yellow')
-lines(inSampLas,col='purple')
+#lines(predict(sampPosModel,type='response'),col='red')
+#lines(predict(dtSampModel),col='green')
+lines(inSampRidge,col='red')
+lines(inSampLas,col='green')
+legend(80, 75, legend=c("Linear", "Ridge","Lasso"),
+       col=c("blue", "red","green"),lty=1:3,cex=0.5)
 
 ######### test
-plot(XtestSamp$Y,main = 'Example Tract Prediction Models Out-sample',xlab = 'Month', 
+plot(XtestSamp$Y,main = 'Example Tract Regularized Linear Prediction Models Out-Sample',xlab = 'Month', 
      ylab = 'Crime Rate')
 lines(exp(predict(object = samplinModel,newdata = XtestSamp)),col='blue')
-lines(predict(sampPosModel,newdata = XtestSamp,type='response'),col='red')
-lines(predict(dtSampModel,newdata = XtestSamp),col='green')
-lines(outSampRidge,col='yellow')
-lines(outSampLas,col='purple')
+#lines(predict(sampPosModel,newdata = XtestSamp,type='response'),col='red')
+#lines(predict(dtSampModel,newdata = XtestSamp),col='green')
+
+lines(outSampRidge,col='red')
+lines(outSampLas,col='green')
+legend(20, 10, legend=c("Linear", "Ridge","Lasso"),
+       col=c("blue", "red","green"),lty=1:3,cex=0.5)
 
 
 #### Error Analysis Basic Models 
@@ -93,7 +98,7 @@ meanSqError = function(x,y) {
 }
 
 modelAccuracy = function(modelType) {
-  holder = matrix(NA,nrow = length(tractList),ncol=2)
+  holder = matrix(NA,nrow = length(tractList),ncol=3)
   for (i in 1:length(tractList)) {
     tractNum = tractList[i]
     print(i)
@@ -103,17 +108,19 @@ modelAccuracy = function(modelType) {
       indLinModel = lm(log(Y) ~Year + Month + Max + Average + Min + Rain,data=XtrainInd)
       holder[i,1] = meanSqError(exp(predict(indLinModel)),XtrainInd$Y)
       holder[i,2] = meanSqError(exp(predict(indLinModel,newdata=XtestInd)),XtestInd$Y)
+      holder[i,3] = var(exp(predict(indLinModel,newdata=XtestInd)))
     } else if (modelType == 'pos'){
       indPosModel = glm(Y ~ Year + Month + Max + Average + Min + Rain,
                         data=XtrainInd, family=poisson())
       holder[i,1] = meanSqError(predict(indPosModel,type='response'),XtrainInd$Y)
       holder[i,2] = meanSqError(predict(indPosModel,newdata=XtestInd,type='response'),XtestInd$Y)
+      holder[i,3] = var(predict(indPosModel,newdata=XtestInd,type='response'))
     } else if (modelType=='tree'){
       indTreeModel = rpart(Y ~ Year + Month + Max + Average + Min + Rain,
                           data=XtrainSamp,method='anova')
       holder[i,1] = meanSqError(predict(indTreeModel),XtrainInd$Y)
       holder[i,2] = meanSqError(predict(indTreeModel,newdata=XtestInd),XtestInd$Y)
-      
+      holder[i,3] = var(predict(indTreeModel,newdata=XtestInd))
     } else if (modelType == 'ridge') {
       genMatirx = as.matrix(XtrainInd[,monthPred])
       crossval <-  cv.glmnet(x = genMatirx, y = XtrainInd[,'Y'])
@@ -126,6 +133,7 @@ modelAccuracy = function(modelType) {
         XtestInd[,monthPred]))
       holder[i,1] = meanSqError(inIndRidge,XtrainInd$Y)
       holder[i,2] = meanSqError(outIndRidge,XtestInd$Y)
+      holder[i,3] = var(outIndRidge)
     }else if (modelType=='lasso') {
       genMatirx = as.matrix(XtrainInd[,monthPred])
       crossval <-  cv.glmnet(x = genMatirx, y = XtrainInd[,'Y'])
@@ -137,32 +145,37 @@ modelAccuracy = function(modelType) {
         XtestInd[,monthPred]))
       holder[i,1] = meanSqError(inIndLas,XtrainInd$Y)
       holder[i,2] = meanSqError(outIndLas,XtestInd$Y)
+      holder[i,3] = var(outIndLas)
       
     }
   }
   holder
 }
 
-basicModelResults = matrix(NA,nrow = length(tractList),ncol=10)
-basicModelResults[,1:2] = modelAccuracy('lin')
-basicModelResults[,3:4] = modelAccuracy('pos')
-basicModelResults[,5:6] = modelAccuracy('tree')
-basicModelResults[,7:8] = modelAccuracy('ridge')
-basicModelResults[,9:10] = modelAccuracy('lasso')
+basicModelResults = matrix(NA,nrow = length(tractList),ncol=15)
+basicModelResults[,1:3] = modelAccuracy('lin')
+basicModelResults[,4:6] = modelAccuracy('pos')
+basicModelResults[,7:9] = modelAccuracy('tree')
+basicModelResults[,10:12] = modelAccuracy('ridge')
+basicModelResults[,13:15] = modelAccuracy('lasso')
 
 
 ## Visulaizations for Basic Model Results
 
 modNames = c('linear','Poisson','Decision Tree','Ridge','Lasso')
 barplot(colSums(basicModelResults)
-        [seq(from=1,to=ncol(basicModelResults),by=2)]/
+        [seq(from=1,to=ncol(basicModelResults),by=3)]/
           nrow(basicModelResults),names.arg =modNames,col = 'blue',
-        main = 'In-Sample Model Errors over all Tracts', ylab = 'Mean Squared Error' )
+        main = 'In-Sample Model Errors over all tracts', ylab = 'Mean Squared Error' )
 
 barplot(colSums(basicModelResults)
-        [seq(from=2,to=ncol(basicModelResults),by=2)]/
+        [seq(from=2,to=ncol(basicModelResults),by=3)]/
           nrow(basicModelResults),names.arg =modNames,col = 'blue',
-        main = 'Out-Sample Model Errors over all Tracts', ylab = 'Mean Squared Error' )
+        main = 'Out-Sample Model Errors over all tracts', ylab = 'Mean Squared Error' )
+
+barplot(colSums(basicModelResults)[seq(from=3,to=ncol(basicModelResults),by=3)]/
+          nrow(basicModelResults),names.arg =modNames,col = 'blue',
+        main = 'Out-Sample Model Variance over all tracts', ylab = 'Variance Error' )
 
 # maxIndex = apply(FUN = function(x) which.max(x),X =
 #                    basicModelResults[,seq(from=2,to=ncol(basicModelResults),by=2)],MARGIN = 1) 
@@ -239,7 +252,7 @@ linearBayesianAnalysis = function(linModelTract, XtrainTract){
 }
 
 bayesianModelAccuracy = function() {
-  holder = matrix(NA,nrow = length(tractList),ncol=2)
+  holder = matrix(NA,nrow = length(tractList),ncol=4)
   for (i in 1:length(tractList)) {
     tractNum = tractList[i]
     print(i)
@@ -249,15 +262,18 @@ bayesianModelAccuracy = function() {
     betaIndHat.samp = linearBayesianAnalysis(indLinModel,XtrainInd)
     ## test correlation 
     collect = matrix(NA,nrow = nrow(betaIndHat.samp),ncol = nrow(XtestInd))
-    corCount = rep(NA,nrow(betaIndHat.samp))
+    corCount = matrix(NA,nrow = nrow(betaIndHat.samp),ncol=2)
     for (k in 1:nrow(betaIndHat.samp)) {
       for (j in 1:nrow(XtestInd)) {
         collect[k,j] = sum(betaIndHat.samp[k,] * c(1,as.numeric(XtestInd[j,monthPred])))
       }
-      corCount[k] =  cor(exp(collect[k,]), XtestInd$Y)
+      corCount[k,1] =  cor(exp(collect[k,]), XtestInd$Y)
+      corCount[k,2] = var(exp(collect[k,]))
     }
-    holder[i,1] = mean(corCount) 
-    holder[i,2] = max(corCount)
+    holder[i,1] = mean(corCount[,1]) 
+    holder[i,2] = max(corCount[,1])
+    holder[i,3] = mean(corCount[,2]) 
+    holder[i,4] = max(corCount[,2]) 
     print(mean(corCount))
     
     
@@ -269,8 +285,17 @@ bayesianModelAccuracy = function() {
 bayesianCorrelationLinearTest = bayesianModelAccuracy()
 
 ## Visualizations
-hist(bayesianCorrelationLinearTest[,1],main = 'Histogram - Bayesian Linear Regression Avg Cor')
-hist(bayesianCorrelationLinearTest[,2],main = 'Histogram - Bayesian Linear Regression Max Cor')
+hist(bayesianCorrelationLinearTest[,1],main = 'Histogram - Bayesian Linear Regression Avg Cor',xlab = 'Average Correlation')
+hist(bayesianCorrelationLinearTest[,4],main = 'Histogram - Bayesian Linear Regression Avg Variance',xlab='Average Variance')
+
+### Variance test data
+varTractHolder = rep(NA,length(tractList))
+for (i in 1:length(tractList)) {
+  tractNum = tractList[i]
+  XtestInd = Xtest[Xtest$tract == tractNum,!(names(Xtest) %in% c('tract'))]
+  varTractHolder[i] = var(XtestInd$Y)
+}
+mean(varTractHolder)
 
 ### Clustering
 # read in from Python
