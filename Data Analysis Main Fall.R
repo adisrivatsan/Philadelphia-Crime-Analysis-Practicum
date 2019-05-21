@@ -1,29 +1,40 @@
-setwd(dir='SeniorFall/Practicum Project/')
-
+setwd(dir='Documents/Penn/SeniorFall/Practicum Project/')
+library(xlsx)
 
 ## read in data 
 
-crimeDf = read.csv(file = 'ProcessedData/YearMonthTractData.csv')
-weatherDf = read.csv(file='ProcessedData/weatherPhiladelphiaData20062015.csv')
+crimeDf = read.csv(file = 'ProcessedDataSets/TotalInfoDF_03_12_2019.csv')
+weatherDf = read.csv(file='ProcessedDataSets/weatherPhiladelphiaData20062015.csv')
 exampleTract = 1102
 
 totalDf = merge(crimeDf,weatherDf,by.x = c('Year','Month'), by.y = c('Year','Month'))
 
 tractList = unique(totalDf$tract)
+nonNumericCols = c('YearTract','violent','nonviolent','Total_y','vice','X.y','X.x')
 
-totalDf = totalDf[,!(names(totalDf) %in% c('YearTract'))]
-colnames(totalDf)
+totalFilteredDf = totalDf[,!(names(totalDf) %in% nonNumericCols)]
+colnames(totalFilteredDf)
 
+excelDfStat = totalFilteredDf[,c('Year','Month','tract','Y')]
+dim(excelDfStat)
+write.csv(x = excelDfStat,file = 'PhillyCrimeNBDModel.csv')
 ## Split into training and testing
 
-Xtrain = totalDf[totalDf$Year %in% 2006:2013,]
-Xtest = totalDf[totalDf$Year %in% 2014:2015,]
+Xtrain = totalFilteredDf[totalDf$Year %in% 2006:2013,]
+Xtest = totalFilteredDf[totalDf$Year %in% 2014:2015,]
 XtrainSamp = Xtrain[Xtrain$tract == exampleTract,!(names(Xtrain) %in% c('tract'))]
 #YtrainSamp = Ytrain[Ytrain$tract == exampleTract,!(names(Ytrain) %in% c('tract'))]
 XtestSamp = Xtest[Xtest$tract == exampleTract,!(names(Xtest) %in% c('tract'))]
 
 ## Month predictors
 monthPred = c('Year','Month','Max','Average','Min','Rain')
+
+### Full Linear Model All tracts
+
+fullLinearModelAT = lm(Y ~ ., data = Xtrain)
+
+
+
 
 ### Sample DATA for visualization 
 ######## Lin Model
